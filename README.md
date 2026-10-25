@@ -1,7 +1,6 @@
 # Drongo
 
-A minimalist agentic harness for learning hard things — inspired by
-[LearnHarness](https://github.com/amosblomqvist/learnharness), rebuilt as a small
+A minimalist agentic harness for learning hard things, built as a small
 local web app. Local-first, plain-file memory, bring your own API key.
 
 Named for the [greater racket-tailed drongo](https://reluctantbookworm.com/2026/01/19/the-greater-racket-tailed-drongo-a-guide-to-organized-mimicry/) —
@@ -132,4 +131,4 @@ Electron packaging. The server core keeps the dependency count at two
 
 ## License
 
-MIT. Concepts inspired by LearnHarness (AGPL-3.0); all code here is original.
+MIT. All code here is original.
