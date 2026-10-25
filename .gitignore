@@ -1,0 +1,5 @@
+node_modules/
+memory/
+*.tsbuildinfo
+.DS_Store
+.zcode/

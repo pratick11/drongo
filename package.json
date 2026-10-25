@@ -1,0 +1,24 @@
+{
+  "name": "drongo",
+  "version": "0.1.0",
+  "description": "Agentic learning harness named for the greater racket-tailed drongo \u2014 the master mimic. Measure, Plan, Teach, Practice \u2014 with local knowledge-graph memory. Bring your own API key.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

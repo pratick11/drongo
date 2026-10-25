@@ -1,0 +1,1 @@
+I am building a local first agentic harness for learning inspired by Hermes agent. It focuses on allowing ai developers to learn concepts from first principles as they interact with ai agents on a day to day basis and trust its thinking process. My idea is to allow devs to be in control of their learning and keep getting better.
