@@ -332,16 +332,52 @@ function countUp(el, target) {
   requestAnimationFrame(tick);
 }
 
+/* Daily activity calendar — month grid of days with session activity.
+   Adapted from Opensource UI's MIT-licensed Daily Activity Calendar widget,
+   restyled to Drongo's aquatic depth tiers (deep water -> shallows). */
+function activityCalendar(sessions) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const counts = new Map();
+  for (const s of sessions) {
+    const d = new Date(s.updatedAt);
+    if (d.getFullYear() === y && d.getMonth() === m) counts.set(d.getDate(), (counts.get(d.getDate()) ?? 0) + 1);
+  }
+  const total = new Date(y, m + 1, 0).getDate();
+  const lead = new Date(y, m, 1).getDay();
+  const today = now.getDate();
+  let cells = ["S", "M", "T", "W", "T", "F", "S"].map((d) => `<span class="cal-cell dow">${d}</span>`).join("");
+  cells += `<span class="cal-cell blank"></span>`.repeat(lead);
+  for (let day = 1; day <= total; day++) {
+    const n = counts.get(day) ?? 0;
+    const tier = n >= 3 ? "t3" : n === 2 ? "t2" : n === 1 ? "t1" : day > today ? "future" : "idle";
+    const mark = day === today ? " today" : "";
+    cells += `<span class="cal-cell ${tier}${mark}" title="${day} · ${n} session${n === 1 ? "" : "s"}">${day}</span>`;
+  }
+  return `
+  <div class="card">
+    <h2>This month</h2>
+    <div class="cal-head">
+      <span class="cal-month">${now.toLocaleDateString(undefined, { month: "short" })}</span>
+      <span class="cal-long">${now.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    <p class="hint">Each fill is a day with session activity — the brighter the water, the more you ran.</p>
+  </div>`;
+}
+
 async function showDashboard() {
   S.session = null;
   setNav("dashboard");
   setMainbar(`Today <span class="crumb">· ${new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span>`);
   const app = $("#app");
   app.innerHTML = `<p class="loading">Loading…</p>`;
-  let st;
+  let st, sessions;
   try {
-    st = await api("/api/state");
+    [st, sessions] = await Promise.all([api("/api/state"), api("/api/sessions")]);
     S.state = st;
+    S.sessions = sessions;
   } catch (e) {
     app.innerHTML = `<div class="page"><div class="errbox">${esc(e.message)}</div></div>`;
     return;
@@ -372,6 +408,7 @@ async function showDashboard() {
         <button id="ns-practice" class="btn secondary" style="margin-top:14px" ${st.totalPropositions ? "" : "disabled"}>${icon("sparkles", 15)} Practice${due ? ` · ${due} due` : ""}</button>
         ${st.totalPropositions ? "" : `<p class="hint">Nothing learned yet — finish a learning session first.</p>`}
       </div>
+      <div class="stack">${activityCalendar(sessions)}</div>
     </div>
     ${st.activeTopics.length ? `
     <div class="card">
