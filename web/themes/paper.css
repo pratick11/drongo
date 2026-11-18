@@ -1,0 +1,36 @@
+/* Paper — warm, low-contrast daylight. Ink on cream with an ochre accent. */
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: #f6f3ec;
+  --surface: #fffdf8;
+  --panel: #efeae0;
+  --raised: #ffffff;
+  --hover: rgba(43, 42, 38, 0.05);
+  --active: rgba(43, 42, 38, 0.09);
+  --text: #2b2a26;
+  --subtext: #5d5a52;
+  --muted: #8d887c;
+  --faint: #cdc6b8;
+  --border: #e4ded1;
+  --border-strong: #d3cabb;
+  --accent: #b45309;
+  --accent-hover: #96470a;
+  --accent-contrast: #fffdf8;
+  --accent-text: #92400e;
+  --accent-subtle: rgba(180, 83, 9, 0.1);
+  --accent-ring: rgba(180, 83, 9, 0.3);
+  --eye: #c2410c;
+  --ok: #3f7d4e;
+  --ok-subtle: rgba(63, 125, 78, 0.1);
+  --danger: #b23a3a;
+  --danger-subtle: rgba(178, 58, 58, 0.08);
+  --info: #2f6f9f;
+  --info-subtle: rgba(47, 111, 159, 0.1);
+  --warn: #a15c07;
+  --warn-subtle: rgba(161, 92, 7, 0.1);
+  --iris-a: #8a5a3b;
+  --iris-b: #b07a4a;
+  --iris-c: #d9a15e;
+  --shadow-pop: 0 1px 2px rgba(60, 50, 30, 0.08), 0 8px 28px rgba(60, 50, 30, 0.12);
+  --shadow-card: 0 1px 2px rgba(60, 50, 30, 0.06);
+}
