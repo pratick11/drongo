@@ -1,0 +1,37 @@
+/* Tokyo Night — the default. Moody indigo, electric blue, soft violet. */
+:root,
+[data-theme="tokyo-night"] {
+  color-scheme: dark;
+  --bg: #1a1b26;
+  --surface: #1f2335;
+  --panel: #16161e;
+  --raised: #24283b;
+  --hover: rgba(192, 202, 245, 0.055);
+  --active: rgba(192, 202, 245, 0.1);
+  --text: #c0caf5;
+  --subtext: #a9b1d6;
+  --muted: #737aa2;
+  --faint: #3b4261;
+  --border: #2a2e42;
+  --border-strong: #3b4261;
+  --accent: #7aa2f7;
+  --accent-hover: #8fb3ff;
+  --accent-contrast: #16161e;
+  --accent-text: #7dcfff;
+  --accent-subtle: rgba(122, 162, 247, 0.13);
+  --accent-ring: rgba(122, 162, 247, 0.4);
+  --eye: #f7768e;
+  --ok: #9ece6a;
+  --ok-subtle: rgba(158, 206, 106, 0.12);
+  --danger: #f7768e;
+  --danger-subtle: rgba(247, 118, 142, 0.1);
+  --info: #7dcfff;
+  --info-subtle: rgba(125, 207, 255, 0.12);
+  --warn: #e0af68;
+  --warn-subtle: rgba(224, 175, 104, 0.12);
+  --iris-a: #7aa2f7;
+  --iris-b: #7dcfff;
+  --iris-c: #bb9af7;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

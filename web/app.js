@@ -2,9 +2,9 @@
 
 /* ============================================================================
    Drongo — harness UI logic
-   Vanilla JS, no build step. Component patterns from affectUI (app shell,
-   tool call cards, message actions) and AICSS (thinking shimmer, streaming
-   caret, orb — MIT).
+   Vanilla JS, no build step: Library, Reader, Settings, and the add-blog flow.
+   Blogs are plain markdown files under memory/blogs/; this file never owns
+   their content, it only renders what the server reads back.
    ========================================================================== */
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -13,10 +13,6 @@ const $ = (sel, el = document) => el.querySelector(sel);
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function md(text) {
-  return DOMPurify.sanitize(marked.parse(text ?? "", { breaks: true, gfm: true }));
 }
 
 async function api(path, opts = {}) {
@@ -45,1038 +41,611 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function clockFmt(ms) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function hostOf(url) {
+  if (!url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand("copy");
-      return true;
-    } catch {
-      return false;
-    } finally {
-      ta.remove();
-    }
-  }
+function countWords(markdown) {
+  const words = String(markdown ?? "").replace(/```[\s\S]*?```/g, " ").match(/\S+/g);
+  return words ? words.length : 0;
 }
 
 /* ---------------------------------------------------------------- icons */
 
 const PATHS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
-  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
-  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.8"/>',
-  graph: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+  book: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  palette: '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h2a4 4 0 0 0 4-4 10 10 0 0 0-10-10z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   panelLeft: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
-  panelRight: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/>',
-  chevron: '<path d="m9 18 6-6-6-6"/>',
-  book: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
-  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  external: '<path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
-  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
-  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-  plan: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/>',
-  clipboard: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
-  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
-  arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
-  stepDone: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
-  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
-  sparkles: '<path d="m12 3 1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/>',
+  arrowLeft: '<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
 };
 
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PATHS[name] ?? ""}</svg>`;
 }
 
-const TOOL_META = {
-  read_memory: { label: "Reading memory", icon: "search" },
-  record_assessment: { label: "Recording assessment", icon: "clipboard" },
-  update_plan: { label: "Building plan", icon: "plan" },
-  save_propositions: { label: "Saving propositions", icon: "database" },
-  mark_step_done: { label: "Marking step done", icon: "stepDone" },
-  report_move: { label: "Adjusting approach", icon: "zap" },
-  schedule_review: { label: "Scheduling reviews", icon: "clock" },
-};
-
-const PHASE_INFO = {
-  measure: ["Measure", "The tutor is probing where your understanding ends — answer in your own words.", "Answer in your own words…"],
-  teach: ["Teach", "Predict → explain → verify. Failed checks get repaired differently, refilled, or blocked — never skipped.", "Make your prediction first…"],
-  practice: ["Practice", "Recall workout — produce the answers unprompted, no peeking.", "Produce the answer unprompted…"],
-  done: ["Complete", "Plan finished. Your knowledge graph has been updated.", "Anything unclear? Ask, or start a new topic…"],
-};
-
 /* ---------------------------------------------------------------- theme */
 
-function initTheme() {
-  const saved = localStorage.getItem("ll-theme");
-  const t = saved === "light" || saved === "dark" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  applyTheme(t);
+/* One CSS file of tokens per theme lives in /themes. Add a theme by dropping
+   a file there and adding its id + label here. */
+const THEMES = [
+  { id: "tokyo-night", name: "Tokyo Night" },
+  { id: "paper", name: "Paper" },
+  { id: "catppuccin", name: "Catppuccin" },
+  { id: "dracula", name: "Dracula" },
+  { id: "github-dark", name: "GitHub Dark" },
+  { id: "gruvbox", name: "Gruvbox" },
+  { id: "monokai", name: "Monokai" },
+  { id: "nord", name: "Nord" },
+  { id: "one-dark", name: "One Dark" },
+  { id: "rose-pine", name: "Rosé Pine" },
+  { id: "solarized", name: "Solarized" },
+];
+
+const DEFAULT_THEME = "tokyo-night";
+const themeById = new Map(THEMES.map((t) => [t.id, t]));
+
+function currentTheme() {
+  const t = document.documentElement.dataset.theme;
+  return themeById.has(t) ? t : DEFAULT_THEME;
 }
 
-function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
-  localStorage.setItem("ll-theme", t);
+function themeSwatch(id) {
+  return `<span class="theme-swatch" data-theme="${id}" aria-hidden="true"><i></i><i></i><i></i></span>`;
+}
+
+function initTheme() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem("drongo-theme");
+  } catch {
+    /* storage may be unavailable */
+  }
+  applyTheme(themeById.has(saved) ? saved : DEFAULT_THEME, false);
+}
+
+function applyTheme(id, persist = true) {
+  const theme = themeById.has(id) ? id : DEFAULT_THEME;
+  document.documentElement.dataset.theme = theme;
+  if (persist) {
+    try {
+      localStorage.setItem("drongo-theme", theme);
+    } catch {
+      /* storage may be unavailable */
+    }
+  }
+  syncThemeUI();
+}
+
+function syncThemeUI() {
+  const cur = currentTheme();
+  document.querySelectorAll("[data-theme-choice]").forEach((el) => {
+    const on = el.dataset.themeChoice === cur;
+    el.classList.toggle("on", on);
+    el.setAttribute("aria-checked", on ? "true" : "false");
+  });
   const btn = $("#theme-toggle");
-  if (btn) btn.innerHTML = icon(t === "dark" ? "sun" : "moon");
+  if (btn) {
+    const label = `Theme: ${themeById.get(cur).name}`;
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+  }
+}
+
+function closeThemeMenu() {
+  const menu = $("#theme-menu");
+  const btn = $("#theme-toggle");
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function buildThemeMenu() {
+  const menu = $("#theme-menu");
+  const btn = $("#theme-toggle");
+  if (!menu || !btn) return;
+
+  btn.innerHTML = icon("palette");
+  menu.innerHTML = THEMES.map(
+    (t) => `
+    <button class="theme-item" type="button" role="menuitemradio" data-theme-choice="${t.id}">
+      ${themeSwatch(t.id)}
+      <span class="theme-name">${esc(t.name)}</span>
+      <span class="theme-check">${icon("check", 14)}</span>
+    </button>`
+  ).join("");
+
+  menu.querySelectorAll("[data-theme-choice]").forEach((el) => {
+    el.onclick = () => {
+      applyTheme(el.dataset.themeChoice);
+      closeThemeMenu();
+      btn.focus();
+    };
+  });
+
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".theme-picker")) closeThemeMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeThemeMenu();
+  });
+
+  syncThemeUI();
+}
+
+function themeCard(t) {
+  return `
+    <button class="theme-card" type="button" role="radio" data-theme="${t.id}" data-theme-choice="${t.id}" title="${esc(t.name)}">
+      ${themeSwatch(t.id)}
+      <span class="theme-card-name">${esc(t.name)}</span>
+      <span class="theme-check">${icon("check", 14)}</span>
+    </button>`;
+}
+
+/* ---------------------------------------------------------------- markdown */
+
+/* A deliberately small renderer: escape first, then apply a fixed set of
+   markdown shapes. Article text comes from the open web, so nothing in it is
+   ever trusted as HTML. */
+function safeHref(url) {
+  const value = String(url ?? "").trim();
+  return /^(https?:\/\/|mailto:|\/|#)/i.test(value) ? value : "";
+}
+
+function inlineMd(escaped) {
+  const code = [];
+  let s = escaped.replace(/`([^`]+)`/g, (_m, inner) => {
+    code.push(`<code>${inner}</code>`);
+    return `\u0001${code.length - 1}\u0001`;
+  });
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, href) => {
+    const safe = safeHref(href);
+    return safe ? `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>` : label;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/\u0001(\d+)\u0001/g, (_m, i) => code[Number(i)] ?? "");
+  return s;
+}
+
+function renderMarkdown(source) {
+  const lines = String(source ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const out = [];
+  let para = [];
+  let list = null;
+
+  const flushPara = () => {
+    if (!para.length) return;
+    out.push(`<p>${inlineMd(esc(para.join(" ")))}</p>`);
+    para = [];
+  };
+  const closeList = () => {
+    if (!list) return;
+    out.push(`</${list}>`);
+    list = null;
+  };
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    const fence = /^```([\w+#.-]*)\s*$/.exec(trimmed);
+    if (fence) {
+      flushPara();
+      closeList();
+      const lang = fence[1];
+      const code = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) {
+        code.push(lines[i]);
+        i++;
+      }
+      i++; // closing fence
+      out.push(`<pre><code${lang ? ` class="language-${lang}"` : ""}>${esc(code.join("\n"))}</code></pre>`);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushPara();
+      closeList();
+      i++;
+      continue;
+    }
+
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (heading) {
+      flushPara();
+      closeList();
+      const level = heading[1].length;
+      out.push(`<h${level}>${inlineMd(esc(heading[2]))}</h${level}>`);
+      i++;
+      continue;
+    }
+
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      flushPara();
+      closeList();
+      out.push("<hr />");
+      i++;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      flushPara();
+      closeList();
+      const quoted = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        quoted.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      out.push(`<blockquote>${renderMarkdown(quoted.join("\n"))}</blockquote>`);
+      continue;
+    }
+
+    const bullet = /^[-*+]\s+(.*)$/.exec(line);
+    const numbered = /^\d+\.\s+(.*)$/.exec(line);
+    if (bullet || numbered) {
+      flushPara();
+      const kind = bullet ? "ul" : "ol";
+      if (list !== kind) {
+        closeList();
+        out.push(`<${kind}>`);
+        list = kind;
+      }
+      out.push(`<li>${inlineMd(esc((bullet || numbered)[1]))}</li>`);
+      i++;
+      continue;
+    }
+
+    closeList();
+    para.push(trimmed);
+    i++;
+  }
+
+  flushPara();
+  closeList();
+  return out.join("\n");
 }
 
 /* ---------------------------------------------------------------- state */
 
 const S = {
-  view: "dashboard",
+  view: "library",
   state: null, // /api/state payload
-  sessions: [], // /api/sessions payload
-  session: null, // active full session
-  streaming: false,
-  openWs: new Set(JSON.parse(localStorage.getItem("ll-ws-open") || "[]")),
 };
 
 /* ---------------------------------------------------------------- shell */
 
 function wireShell() {
-  $("#sb-new .i").innerHTML = icon("plus");
-  $("#sb-practice .i").innerHTML = icon("zap");
-  document.querySelectorAll(".sb-nav a").forEach((a) => (a.querySelector(".i").innerHTML = icon(a.dataset.view === "graph" ? "graph" : "home")));
+  document.querySelectorAll("[data-icon]").forEach((el) => {
+    const target = el.classList.contains("icon-btn") ? el : el.querySelector(".i");
+    if (target) target.innerHTML = icon(el.dataset.icon);
+  });
   $("#sb-collapse").innerHTML = icon("panelLeft");
   $("#sb-menu").innerHTML = icon("menu");
-  document.querySelector('.sb-foot a[href="#/settings"]').innerHTML = icon("settings");
 
-  $("#theme-toggle").onclick = () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  buildThemeMenu();
 
   $("#sb-collapse").onclick = () => {
     const rail = document.body.classList.toggle("rail");
-    localStorage.setItem("ll-rail", rail ? "1" : "0");
+    localStorage.setItem("drongo-rail", rail ? "1" : "0");
   };
-  if (localStorage.getItem("ll-rail") === "1") document.body.classList.add("rail");
+  if (localStorage.getItem("drongo-rail") === "1") document.body.classList.add("rail");
 
   $("#sb-menu").onclick = () => document.body.classList.add("sb-open");
   $("#sb-backdrop").onclick = () => document.body.classList.remove("sb-open");
 
-  $("#cg-scrim").onclick = closeConceptDrawer;
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeConceptDrawer();
-  });
-
-  $("#sb-new").onclick = () => {
+  $("#sb-add").onclick = () => {
     document.body.classList.remove("sb-open");
-    if (S.view === "dashboard") $("#ns-topic")?.focus();
-    else location.hash = "#/";
-    if (S.view === "dashboard") setTimeout(() => $("#ns-topic")?.focus(), 0);
+    openAddBlog();
   };
+}
 
-  $("#sb-practice").onclick = async () => {
-    try {
-      const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ mode: "practice" }) });
-      document.body.classList.remove("sb-open");
-      if (s.resumed) toast("Resuming today's workout.");
-      location.hash = `#/session/${s.id}`;
-    } catch (e) {
-      toast(e.message, true);
-    }
-  };
+function setNav(view) {
+  S.view = view;
+  document.querySelectorAll(".sb-nav a").forEach((a) => a.classList.toggle("on", a.dataset.view === view));
+}
+
+function setMainbar(title) {
+  $("#mainbar-title").textContent = title;
 }
 
 async function refreshShell() {
   try {
-    const [st, sessions] = await Promise.all([api("/api/state"), api("/api/sessions")]);
-    S.state = st;
-    S.sessions = sessions;
-  } catch (e) {
-    $("#sb-stats").textContent = "";
+    S.state = await api("/api/state");
+  } catch {
+    $("#model-chip").textContent = "";
     return;
   }
-  renderSidebar();
+  $("#model-chip").textContent = S.state.config.model;
+  renderBlogList();
 }
 
-function sessionRow(s, active) {
-  const a = document.createElement("a");
-  a.className = "srow" + (active ? " on" : "");
-  a.href = `#/session/${s.id}`;
-  const live = active && S.streaming ? " live" : "";
-  a.innerHTML = `
-    <span class="i">${icon(s.mode === "practice" ? "sparkles" : "book", 14)}</span>
-    <span class="srow-name">${esc(s.mode === "practice" ? "Recall workout" : s.topicName)}</span>
-    <span class="srow-dot ${esc(s.phase)}${live}"></span>
-    <span class="ws-meta">${relTime(s.updatedAt)}</span>`;
-  a.onclick = () => document.body.classList.remove("sb-open");
-  return a;
-}
-
-function renderSidebar() {
-  const st = S.state;
-  if (!st) return;
-
-  // nav + footer stats
-  const propsPill = $("#nav-props");
-  propsPill.hidden = !st.totalPropositions;
-  propsPill.textContent = st.totalPropositions;
-  const duePill = $("#sb-due-pill");
-  duePill.hidden = !st.dueCount;
-  duePill.textContent = `${st.dueCount} due`;
-  $("#sb-stats").innerHTML = `
-    <span class="stat"><b>${st.streak}</b>${icon("flame", 13)}streak</span>
-    <span class="stat ${st.dueCount ? "hot" : ""}"><b>${st.dueCount}</b>${icon("clock", 13)}due</span>`;
-  $("#model-chip").textContent = st.config?.model || "";
-
-  // workspaces: active topics with their sessions
-  const activeId = S.session?.id ?? null;
-  const activeTopicId = S.session?.topicId ?? null;
-  const byTopic = new Map();
-  for (const s of S.sessions) {
-    if (!byTopic.has(s.topicId)) byTopic.set(s.topicId, []);
-    byTopic.get(s.topicId).push(s);
+function renderBlogList() {
+  const list = $("#blog-list");
+  const blogs = S.state?.blogs ?? [];
+  if (!blogs.length) {
+    list.innerHTML = `<p class="sb-empty">Nothing saved yet.</p>`;
+    return;
   }
-
-  const wsBox = $("#sb-workspaces");
-  const wsList = $("#ws-list");
-  wsList.innerHTML = "";
-  const topics = st.activeTopics ?? [];
-  wsBox.hidden = !topics.length;
-  for (const t of topics) {
-    const group = document.createElement("div");
-    const isOpen = S.openWs.has(t.topicId) || t.topicId === activeTopicId;
-    group.className = "ws" + (isOpen ? " open" : "") + (t.total && t.done >= t.total ? " done" : "");
-    const pct = t.total ? Math.round((100 * t.done) / t.total) : 0;
-    const sessions = (byTopic.get(t.topicId) ?? []).slice(0, 6);
-    group.innerHTML = `
-      <button class="ws-head" title="${esc(t.name)}">
-        <span class="ws-toggle">${icon("chevron", 12)}</span>
-        <span class="ws-info">
-          <span class="ws-name">${esc(t.name)}</span>
-          <span class="ws-prog"><div style="width:${pct}%"></div></span>
-          <span class="ws-meta">${t.total ? `${t.done}/${t.total} steps${t.currentStepTitle ? ` · ${esc(t.currentStepTitle)}` : ""}` : "plan pending"}</span>
-        </span>
-      </button>
-      <div class="ws-sessions"></div>`;
-    group.querySelector(".ws-head").onclick = () => {
-      if (S.openWs.has(t.topicId)) S.openWs.delete(t.topicId);
-      else S.openWs.add(t.topicId);
-      localStorage.setItem("ll-ws-open", JSON.stringify([...S.openWs]));
-      group.classList.toggle("open");
-    };
-    const holder = group.querySelector(".ws-sessions");
-    for (const s of sessions) holder.append(sessionRow(s, s.id === activeId));
-    wsList.append(group);
-    byTopic.delete(t.topicId);
-  }
-
-  // recent: everything else (practice sessions, finished topics)
-  const rest = [...byTopic.values()].flat().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
-  const recentBox = $("#sb-recent");
-  const recentList = $("#recent-list");
-  recentList.innerHTML = "";
-  recentBox.hidden = !rest.length;
-  for (const s of rest) recentList.append(sessionRow(s, s.id === activeId));
-
-  if (!topics.length && !rest.length) {
-    wsBox.hidden = false;
-    wsList.innerHTML = `<p class="sb-empty">No workspaces yet — start a learning session and it will live here.</p>`;
-  }
-}
-
-function setNav(view, sessionId) {
-  S.view = view;
-  document.querySelectorAll(".sb-nav a").forEach((a) => a.classList.toggle("on", a.dataset.view === view && !sessionId));
-  document.title = "Drongo";
-}
-
-function setMainbar(titleHtml, actions = "") {
-  $("#mainbar-title").innerHTML = titleHtml;
-  $("#mainbar-actions").innerHTML = actions;
+  list.innerHTML = blogs
+    .map(
+      (b) => `
+      <a class="sb-blog" href="#/blog/${encodeURIComponent(b.slug)}" title="${esc(b.title)}">
+        <span class="sb-blog-title">${esc(b.title)}</span>
+        <span class="sb-blog-meta">${esc(hostOf(b.url) || "Pasted")} · ${b.minutes} min</span>
+      </a>`
+    )
+    .join("");
 }
 
 /* ---------------------------------------------------------------- router */
 
-window.addEventListener("hashchange", route);
-
 function route() {
-  closeConceptDrawer();
-  const [view, arg] = (location.hash || "#/").slice(2).split("/");
-  if (view === "session" && arg) showSession(arg);
-  else if (view === "graph") showGraph();
-  else if (view === "settings") showSettings();
-  else showDashboard();
+  const hash = location.hash.replace(/^#\/?/, "");
+  if (hash.startsWith("settings")) return showSettings();
+  const blog = /^blog\/([^/]+)$/.exec(hash);
+  if (blog) return showReader(decodeURIComponent(blog[1]));
+  return showLibrary();
 }
 
-/* ---------------------------------------------------------------- dashboard */
-
-function countUp(el, target) {
-  if (!target) {
-    el.textContent = "0";
-    return;
-  }
-  const t0 = performance.now();
-  const dur = 450;
-  const tick = (t) => {
-    const k = Math.min(1, (t - t0) / dur);
-    el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3)));
-    if (k < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+function navigate(hash) {
+  if (location.hash === hash) route();
+  else location.hash = hash;
 }
 
-/* Daily activity calendar — month grid of days with session activity.
-   Adapted from Opensource UI's MIT-licensed Daily Activity Calendar widget,
-   restyled to Drongo's aquatic depth tiers (deep water -> shallows). */
-function activityCalendar(sessions) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const counts = new Map();
-  for (const s of sessions) {
-    const d = new Date(s.updatedAt);
-    if (d.getFullYear() === y && d.getMonth() === m) counts.set(d.getDate(), (counts.get(d.getDate()) ?? 0) + 1);
-  }
-  const total = new Date(y, m + 1, 0).getDate();
-  const lead = new Date(y, m, 1).getDay();
-  const today = now.getDate();
-  let cells = ["S", "M", "T", "W", "T", "F", "S"].map((d) => `<span class="cal-cell dow">${d}</span>`).join("");
-  cells += `<span class="cal-cell blank"></span>`.repeat(lead);
-  for (let day = 1; day <= total; day++) {
-    const n = counts.get(day) ?? 0;
-    const tier = n >= 3 ? "t3" : n === 2 ? "t2" : n === 1 ? "t1" : day > today ? "future" : "idle";
-    const mark = day === today ? " today" : "";
-    cells += `<span class="cal-cell ${tier}${mark}" title="${day} · ${n} session${n === 1 ? "" : "s"}">${day}</span>`;
-  }
+/* ---------------------------------------------------------------- library */
+
+function blogCard(b) {
+  const source = b.url ? hostOf(b.url) : "Pasted";
   return `
-  <div class="card">
-    <h2>This month</h2>
-    <div class="cal-head">
-      <span class="cal-month">${now.toLocaleDateString(undefined, { month: "short" })}</span>
-      <span class="cal-long">${now.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
-    </div>
-    <div class="cal-grid">${cells}</div>
-    <p class="hint">Each fill is a day with session activity — the brighter the water, the more you ran.</p>
-  </div>`;
+  <article class="blog-card">
+    <a class="blog-card-body" href="#/blog/${encodeURIComponent(b.slug)}">
+      <span class="blog-card-meta"><span class="pill">${esc(source)}</span><span class="dot">·</span><span>${b.minutes} min</span></span>
+      <h2>${esc(b.title)}</h2>
+      <p>${esc(b.excerpt || "No excerpt.")}</p>
+      <span class="blog-card-open">Open reader <span aria-hidden="true">→</span></span>
+    </a>
+    <button class="icon-btn blog-card-del" data-delete-blog="${esc(b.slug)}" data-title="${esc(b.title)}" title="Delete" aria-label="Delete ${esc(b.title)}">${icon("trash")}</button>
+  </article>`;
 }
 
-async function showDashboard() {
-  S.session = null;
-  setNav("dashboard");
-  setMainbar(`Today <span class="crumb">· ${new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span>`);
+function showLibrary() {
+  setNav("library");
+  setMainbar("Library");
+  document.title = "Drongo — Library";
   const app = $("#app");
-  app.innerHTML = `<p class="loading">Loading…</p>`;
-  let st, sessions;
-  try {
-    [st, sessions] = await Promise.all([api("/api/state"), api("/api/sessions")]);
-    S.state = st;
-    S.sessions = sessions;
-  } catch (e) {
-    app.innerHTML = `<div class="page"><div class="errbox">${esc(e.message)}</div></div>`;
-    return;
-  }
-  renderSidebar();
-  const due = st.dueCount;
+  const blogs = S.state?.blogs ?? [];
+  const noKey = S.state && !S.state.hasKey;
+
+  const empty = `
+  <div class="card">
+    <h2>Nothing saved yet</h2>
+    <p class="hint">You save engineering blogs faster than you read them. Keep the ones you actually care about: paste a URL and Drongo fetches a cleaned markdown copy into <code>memory/blogs/</code> — or paste the text itself.</p>
+    <div class="empty">
+      ${icon("book", 26)}
+      <div>Saved blogs appear here, ready to read and study.</div>
+      <button class="btn primary" data-add-blog style="margin-top:16px">${icon("plus")}<span>Add your first blog</span></button>
+    </div>
+  </div>`;
+
   app.innerHTML = `
   <div class="page">
-    <div class="page-head"><h1>Today</h1><span class="sub">We are all mimics — some masters, some apprentices.</span></div>
-    ${st.hasKey ? "" : `<div class="warnbox">${icon("zap", 15)} No API key configured yet. <a href="#/settings">Open Settings →</a></div>`}
-    <div class="statgrid">
-      <div class="stat accent"><div class="k">${icon("flame", 13)} Streak</div><div class="v" data-n="${st.streak}">0</div><div class="k">days in a row</div></div>
-      <div class="stat ${due ? "hot" : ""}"><div class="k">${icon("clock", 13)} Due for review</div><div class="v" data-n="${due}">0</div><div class="k">spaced repetition</div></div>
-      <div class="stat"><div class="k">${icon("zap", 13)} Learned today</div><div class="v" data-n="${st.learnedToday}">0</div><div class="k">new propositions</div></div>
-      <div class="stat"><div class="k">${icon("database", 13)} Knowledge</div><div class="v" data-n="${st.totalPropositions}">0</div><div class="k">propositions held</div></div>
+    <div class="page-head">
+      <h1>Library</h1>
+      <span class="sub">${blogs.length} saved blog${blogs.length === 1 ? "" : "s"}</span>
+      ${blogs.length ? `<button class="btn primary page-action" data-add-blog>${icon("plus")}<span>Add blog</span></button>` : ""}
     </div>
-    <div class="cols2">
-      <div class="card">
-        <h2>New learning session</h2>
-        <p class="hint">The tutor measures where your understanding starts, plans from there, then teaches step by step.</p>
-        <div class="field" style="margin-top:14px"><span>Topic</span><input type="text" id="ns-topic" placeholder="e.g. B-trees from first principles" /></div>
-        <div class="field"><span>Goal <i style="font-style:normal;color:var(--muted);font-weight:400">(optional)</i></span><textarea id="ns-goal" rows="2" placeholder="e.g. implement one and explain when it beats a red-black tree"></textarea></div>
-        <button id="ns-start" class="btn primary">${icon("plus", 15)} Start session</button>
-      </div>
-      <div class="card">
-        <h2>Practice recall</h2>
-        <p class="hint">Varied problems drawn from your knowledge graph. Spaced repetition decides what's due — produce answers unprompted.</p>
-        <button id="ns-practice" class="btn secondary" style="margin-top:14px" ${st.totalPropositions ? "" : "disabled"}>${icon("sparkles", 15)} Practice${due ? ` · ${due} due` : ""}</button>
-        ${st.totalPropositions ? "" : `<p class="hint">Nothing learned yet — finish a learning session first.</p>`}
-      </div>
-      <div class="stack">${activityCalendar(sessions)}</div>
-    </div>
-    ${st.activeTopics.length ? `
-    <div class="card">
-      <h2>Active workspaces</h2>
-      <div class="rowlist">${st.activeTopics.map((t) => `
-        <div class="trow">
-          <div class="trow-main">
-            <div class="trow-title">${esc(t.name)}</div>
-            ${t.goal ? `<div class="trow-sub">${esc(t.goal)}</div>` : ""}
-            <div class="prog"><div style="width:${t.total ? (100 * t.done) / t.total : 0}%"></div></div>
-            <div class="trow-sub" style="margin-top:5px">${t.total ? `${t.done}/${t.total} steps${t.currentStepTitle ? ` · next: ${esc(t.currentStepTitle)}` : ""}` : "plan pending"}</div>
-          </div>
-          ${t.resumeSessionId ? `<a class="btn secondary" href="#/session/${t.resumeSessionId}">Continue</a>` : ""}
-        </div>`).join("")}</div>
-    </div>` : ""}
-    ${st.recentSessions.length ? `
-    <div class="card">
-      <h2>Recent sessions</h2>
-      <div class="rowlist">${st.recentSessions.map((s) => `
-        <div class="trow">
-          <div class="trow-main">
-            <div class="trow-title">${esc(s.topicName)} <span class="pill phase ${esc(s.phase)}">${esc(PHASE_INFO[s.phase]?.[0] ?? s.phase)}</span></div>
-            <div class="trow-sub">${s.mode} · ${relTime(s.updatedAt)}</div>
-          </div>
-          <a class="btn ghost" href="#/session/${s.id}">Open</a>
-        </div>`).join("")}</div>
-    </div>` : ""}
+    ${noKey ? `<div class="warnbox">No model configured yet. <a href="#/settings">Open Settings</a> to add your API key.</div>` : ""}
+    ${blogs.length ? `<div class="blog-grid">${blogs.map(blogCard).join("")}</div>` : empty}
+    ${blogs.length ? `<p class="lib-foot">Every post is a plain markdown file in <code>memory/blogs/</code> — edit, back up, or delete it outside the app.</p>` : ""}
   </div>`;
 
-  app.querySelectorAll(".stat .v").forEach((el) => countUp(el, Number(el.dataset.n || 0)));
-
-  $("#ns-start").onclick = async () => {
-    const topic = $("#ns-topic").value.trim();
-    const goal = $("#ns-goal").value.trim();
-    if (!topic) return toast("Give the session a topic.", true);
-    try {
-      const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ mode: "learn", topic, goal }) });
-      location.hash = `#/session/${s.id}`;
-    } catch (e) {
-      toast(e.message, true);
-    }
-  };
-  $("#ns-practice").onclick = async () => {
-    try {
-      const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ mode: "practice" }) });
-      if (s.resumed) toast("Resuming today's workout.");
-      location.hash = `#/session/${s.id}`;
-    } catch (e) {
-      toast(e.message, true);
-    }
-  };
+  app.querySelectorAll("[data-add-blog]").forEach((el) => (el.onclick = openAddBlog));
+  app.querySelectorAll("[data-delete-blog]").forEach((el) => {
+    el.onclick = () => deleteSavedBlog(el.dataset.deleteBlog, el.dataset.title || "", showLibrary);
+  });
+  app.scrollTop = 0;
 }
 
-/* ---------------------------------------------------------------- session view */
+/* ---------------------------------------------------------------- reader */
 
-async function showSession(id) {
+async function showReader(slug) {
+  setNav("library");
+  setMainbar("Reader");
+  document.title = "Reader — Drongo";
   const app = $("#app");
   app.innerHTML = `<p class="loading">Loading…</p>`;
-  let s;
+
+  let blog;
   try {
-    s = await api(`/api/sessions/${id}`);
+    blog = await api(`/api/blogs/${encodeURIComponent(slug)}`);
   } catch (e) {
-    setNav(null);
-    setMainbar("Session");
-    app.innerHTML = `<div class="page"><div class="errbox">${esc(e.message)}</div></div>`;
+    app.innerHTML = `
+    <div class="page narrow">
+      <div class="errbox">${esc(e.message)}</div>
+      <p><a href="#/">← Back to the library</a></p>
+    </div>`;
     return;
   }
-  S.session = s;
-  setNav(null, id);
-  setMainbar(
-    `${icon(s.mode === "practice" ? "sparkles" : "book", 15)}<span>${esc(s.topicName)}</span><span class="pill phase ${esc(s.phase)}">${esc(PHASE_INFO[s.phase]?.[0] ?? s.phase)}</span>`,
-    `<button class="icon-btn" id="ctx-toggle" title="Toggle context panel" aria-label="Toggle context panel">${icon("panelRight")}</button>`,
-  );
-  document.title = `${s.topicName} — Drongo`;
-  renderSidebar();
+
+  document.title = `${blog.title} — Drongo`;
+  const words = countWords(blog.markdown);
+  const minutes = Math.max(1, Math.round(words / 220));
+  const source = hostOf(blog.url);
 
   app.innerHTML = `
-  <div class="session">
-    <div class="chat-col">
-      <div class="chat" id="chat"><div class="chat-inner" id="chat-inner"></div></div>
-      <div class="composer-wrap">
-        <div class="composer">
-          <textarea id="input" rows="1" placeholder="${esc(PHASE_INFO[s.phase]?.[2] ?? "Type a reply…")} (Enter to send)"></textarea>
-          <div class="composer-bar">
-            <span class="composer-hint">${esc(PHASE_INFO[s.phase]?.[1] ?? "")}</span>
-            <span class="spacer"></span>
-            <button class="btn-continue" id="continue" title="Let the tutor proceed without new input">Continue</button>
-            <button class="btn-send" id="send" aria-label="Send">${icon("arrowUp", 16)}</button>
-          </div>
+  <div class="reader">
+    <a class="reader-back" href="#/">${icon("arrowLeft")}<span>Library</span></a>
+    <header class="reader-head">
+      <h1>${esc(blog.title)}</h1>
+      <div class="reader-meta">
+        ${blog.url ? `<a href="${esc(blog.url)}" target="_blank" rel="noopener noreferrer">${esc(source)} ${icon("external", 13)}</a>` : `<span>Pasted text</span>`}
+        <span class="dot">·</span>
+        <span>${esc(relTime(blog.addedAt))}</span>
+        <span class="dot">·</span>
+        <span>${words.toLocaleString()} words · ${minutes} min</span>
+      </div>
+      <div class="reader-actions">
+        <button class="btn secondary" data-add-blog>${icon("plus")}<span>Add blog</span></button>
+        <button class="btn ghost danger" id="reader-del">${icon("trash")}<span>Delete</span></button>
+      </div>
+    </header>
+    <article class="prose">${renderMarkdown(blog.markdown)}</article>
+  </div>`;
+
+  app.querySelectorAll("[data-add-blog]").forEach((el) => (el.onclick = openAddBlog));
+  $("#reader-del").onclick = () => deleteSavedBlog(blog.slug, blog.title, () => navigate("#/"));
+  app.scrollTop = 0;
+}
+
+async function deleteSavedBlog(slug, title, done) {
+  const ok = window.confirm(`Delete “${title || slug}” from the library?\n\nThe markdown file will be removed.`);
+  if (!ok) return;
+  try {
+    await api(`/api/blogs/${encodeURIComponent(slug)}`, { method: "DELETE" });
+    await refreshShell();
+    toast("Deleted.");
+    done();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+/* ---------------------------------------------------------------- add blog */
+
+function openAddBlog() {
+  if ($("#add-modal")) return;
+
+  const wrap = document.createElement("div");
+  wrap.id = "add-modal";
+  wrap.className = "modal-backdrop";
+  wrap.innerHTML = `
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title">
+    <div class="modal-head">
+      <h2 id="add-title">Add a blog</h2>
+      <button type="button" class="icon-btn" id="add-close" aria-label="Close">${icon("x")}</button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Source">
+      <button type="button" class="tab on" data-tab="url" role="tab" aria-selected="true">From URL</button>
+      <button type="button" class="tab" data-tab="paste" role="tab" aria-selected="false">Paste text</button>
+    </div>
+    <form id="add-form" novalidate>
+      <div data-pane="url">
+        <div class="field"><span>Post URL</span>
+          <input id="add-url" type="text" placeholder="https://example.com/blog/post" autocomplete="off" spellcheck="false" />
+        </div>
+        <p class="hint">Drongo fetches the page once and keeps a cleaned markdown copy. Nothing stays connected afterwards.</p>
+      </div>
+      <div data-pane="paste" hidden>
+        <div class="field"><span>Title <i>(optional)</i></span>
+          <input id="add-paste-title" type="text" placeholder="Inferred from the first heading" />
+        </div>
+        <div class="field"><span>Article</span>
+          <textarea id="add-markdown" rows="12" placeholder="Paste the post here — markdown or plain text both work."></textarea>
         </div>
       </div>
-    </div>
-    <aside class="ctx" id="ctx"></aside>
-  </div>`;
-
-  const inner = $("#chat-inner");
-  for (const m of s.messages) {
-    if (m.role === "user") addMsg("user", m.content);
-    else if (m.role === "assistant" && m.content) addMsg("assistant", m.content);
-  }
-  scrollChat(true);
-  renderCtx(s);
-  wireComposer();
-
-  $("#ctx-toggle").onclick = () => {
-    if (window.matchMedia("(max-width: 1180px)").matches) document.body.classList.toggle("ctx-open");
-    else document.body.classList.toggle("no-ctx");
-  };
-
-  // A fresh (or interrupted) session ends on a user message — pick up the turn.
-  const last = s.messages[s.messages.length - 1];
-  if (last && last.role === "user") kick("");
-}
-
-function nearBottom() {
-  const chat = $("#chat");
-  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 120;
-}
-
-function scrollChat(force = false) {
-  const chat = $("#chat");
-  if (!chat) return;
-  if (force || nearBottom()) chat.scrollTop = chat.scrollHeight;
-}
-
-function addMsg(kind, text) {
-  const inner = $("#chat-inner");
-  const el = document.createElement("div");
-  if (kind === "user") {
-    el.className = "msg-user";
-    el.innerHTML = md(text);
-  } else if (kind === "assistant") {
-    el.className = "msg-ai";
-    el.innerHTML = `<div class="msg-ai-body">${md(text)}</div>`;
-    addActions(el, text);
-  } else {
-    el.className = "errbox";
-    el.textContent = text;
-  }
-  inner.append(el);
-  scrollChat();
-  return el;
-}
-
-/* quiet message-actions bar (affectUI): copy flips to a check */
-function addActions(msgEl, text) {
-  const bar = document.createElement("div");
-  bar.className = "msg-actions";
-  const btn = document.createElement("button");
-  btn.className = "icon-btn";
-  btn.title = "Copy";
-  btn.setAttribute("aria-label", "Copy message");
-  btn.innerHTML = icon("copy", 13);
-  btn.onclick = async () => {
-    if (await copyText(text)) {
-      btn.innerHTML = icon("check", 13);
-      btn.classList.add("copied");
-      btn.title = "Copied";
-      setTimeout(() => {
-        btn.innerHTML = icon("copy", 13);
-        btn.classList.remove("copied");
-        btn.title = "Copy";
-      }, 1600);
-    } else toast("Copy failed", true);
-  };
-  bar.append(btn);
-  msgEl.append(bar);
-}
-
-/* ------------------------------------------------ context panel */
-
-function renderCtx(s) {
-  const ctx = $("#ctx");
-  if (!ctx) return;
-  const [title, blurb] = PHASE_INFO[s.phase] ?? [s.phase, ""];
-  const steps = s.plan?.steps ?? [];
-  const done = steps.filter((x) => x.doneAt).length;
-  const pct = steps.length ? Math.round((100 * done) / steps.length) : 0;
-  ctx.innerHTML = `
-    <div class="ctx-head"><span class="pill phase ${esc(s.phase)}">${esc(title)}</span></div>
-    <p class="goal" style="margin-top:6px">${esc(blurb)}</p>
-    <h3>Topic</h3>
-    <p class="topic-name">${esc(s.topicName)}</p>
-    ${s.goal ? `<p class="goal">${esc(s.goal)}</p>` : ""}
-    ${steps.length ? `
-    <h3>Plan</h3>
-    <div class="ctx-bar"><div style="width:${pct}%"></div></div>
-    <div class="ctx-count">${done}/${steps.length} steps</div>
-    <ul class="plan">${steps.map((st) => `
-      <li class="${st.doneAt ? "done" : ""}${!st.doneAt && st.blockedAt ? " blocked" : ""}${st.id === s.currentStepId && !st.doneAt ? " current" : ""}">
-        <span class="tick">${st.blockedAt && !st.doneAt ? icon("x", 10) : icon("check", 10)}</span>
-        <span>${esc(st.title)}${st.blockedAt && !st.doneAt ? " — blocked" : ""}${st.id === s.currentStepId && !st.doneAt && st.description ? `<div class="step-desc">${esc(st.description)}</div>` : ""}</span>
-      </li>`).join("")}</ul>` : ""}
-    ${s.mode === "practice" && s.practiceIds.length ? `
-    <h3>Recall targets</h3>
-    <div class="targets">${s.practiceIds.map((id) => `<code>${esc(id.slice(0, 16))}</code>`).join("")}</div>` : ""}`;
-}
-
-async function refreshCtx() {
-  if (!S.session) return;
-  try {
-    S.session = await api(`/api/sessions/${S.session.id}`);
-    renderCtx(S.session);
-    renderSidebar();
-    const [title, blurb, placeholder] = PHASE_INFO[S.session.phase] ?? [S.session.phase, ""];
-    setMainbar(
-      `${icon(S.session.mode === "practice" ? "sparkles" : "book", 15)}<span>${esc(S.session.topicName)}</span><span class="pill phase ${esc(S.session.phase)}">${esc(title)}</span>`,
-      $("#mainbar-actions").innerHTML,
-    );
-    const input = $("#input");
-    if (input && !S.streaming) input.placeholder = `${placeholder ?? "Type a reply…"} (Enter to send)`;
-    const hint = $(".composer-hint");
-    if (hint) hint.textContent = blurb ?? "";
-  } catch {
-    /* context refresh is best-effort */
-  }
-}
-
-/* ------------------------------------------------ composer */
-
-function wireComposer() {
-  const input = $("#input");
-  const doSend = () => {
-    const v = input.value.trim();
-    input.value = "";
-    input.style.height = "auto";
-    kick(v);
-  };
-  $("#send").onclick = doSend;
-  $("#continue").onclick = () => kick("");
-  input.onkeydown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      doSend();
-    }
-  };
-  input.oninput = () => {
-    input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 180) + "px";
-  };
-  input.focus();
-}
-
-function setComposer(enabled) {
-  const input = $("#input");
-  if (input) input.disabled = !enabled;
-  const send = $("#send");
-  if (send) send.disabled = !enabled;
-  const cont = $("#continue");
-  if (cont) cont.disabled = !enabled;
-  if (enabled) input?.focus();
-}
-
-/* ------------------------------------------------ tool call cards (affectUI) */
-
-function makeToolCard(name, args) {
-  const meta = TOOL_META[name] ?? { label: name, icon: "stepDone" };
-  const el = document.createElement("div");
-  el.className = "toolcard running";
-  let argsText = "";
-  try {
-    argsText = args && typeof args === "object" && Object.keys(args).length ? JSON.stringify(args, null, 2) : "";
-  } catch {
-    argsText = "";
-  }
-  el.innerHTML = `
-    <button class="toolcard-head" title="Show detail">
-      <span class="i">${icon(meta.icon, 14)}</span>
-      <span class="toolcard-label">${esc(meta.label)}</span>
-      <span class="toolcard-timer">0:00</span>
-      <span class="toolcard-status"><span class="orb" style="width:7px;height:7px"></span></span>
-    </button>
-    <div class="toolcard-body"><pre></pre></div>`;
-  const pre = el.querySelector("pre");
-  if (argsText) pre.textContent = argsText + "\n";
-  el._detail = pre;
-  el._t0 = performance.now();
-  el._timer = setInterval(() => {
-    el.querySelector(".toolcard-timer").textContent = clockFmt(performance.now() - el._t0);
-  }, 500);
-  el.querySelector(".toolcard-head").onclick = () => el.classList.toggle("open");
-  return el;
-}
-
-function settleToolCard(el, ok, output) {
-  if (!el || el._settled) return;
-  el._settled = true;
-  clearInterval(el._timer);
-  el.querySelector(".toolcard-timer").textContent = clockFmt(performance.now() - el._t0);
-  el.classList.remove("running");
-  el.classList.add(ok ? "ok" : "err");
-  el.querySelector(".toolcard-status").innerHTML = icon(ok ? "check" : "x", 13);
-  if (output) el._detail.textContent += `\n→ ${output}`;
-  if (!ok) el.classList.add("open");
-}
-
-/* ------------------------------------------------ streaming turn */
-
-async function kick(content) {
-  if (S.streaming || !S.session) return;
-  const inner = $("#chat-inner");
-  if (!inner) return;
-  if (content) addMsg("user", content);
-  S.streaming = true;
-  setComposer(false);
-  $("#send").classList.add("busy");
-  renderSidebar();
-
-  let thinking = null; // AICSS shimmer while waiting for the first token
-  let textEl = null; // current assistant text block
-  let bodyEl = null;
-  let raw = "";
-  let card = null; // current tool card
-  let scheduled = false;
-
-  const ensureThinking = () => {
-    if (!thinking) {
-      thinking = document.createElement("div");
-      thinking.className = "thinking";
-      thinking.innerHTML = `<span class="orb"></span><span class="shimmer">Thinking</span>`;
-      inner.append(thinking);
-      scrollChat();
-    }
-  };
-  const dropThinking = () => {
-    thinking?.remove();
-    thinking = null;
-  };
-  const ensureText = () => {
-    if (!textEl) {
-      textEl = document.createElement("div");
-      textEl.className = "msg-ai";
-      bodyEl = document.createElement("div");
-      bodyEl.className = "msg-ai-body";
-      textEl.append(bodyEl);
-      inner.append(textEl);
-    }
-  };
-  const finalizeText = () => {
-    if (!textEl) return;
-    const el = bodyEl.querySelector(".caret");
-    if (el) el.remove();
-    addActions(textEl, raw);
-    textEl = null;
-    bodyEl = null;
-    raw = "";
-  };
-  const paint = () => {
-    scheduled = false;
-    if (!bodyEl) return;
-    bodyEl.innerHTML = md(raw);
-    // caret rides at the end of the last rendered block (AICSS streaming text)
-    const host = bodyEl.lastElementChild && bodyEl.lastElementChild.tagName !== "PRE" ? bodyEl.lastElementChild : bodyEl;
-    const caret = document.createElement("span");
-    caret.className = "caret";
-    host.append(caret);
-    scrollChat();
-  };
-  const queuePaint = () => {
-    if (!scheduled) {
-      scheduled = true;
-      requestAnimationFrame(paint);
-    }
-  };
-
-  ensureThinking();
-
-  try {
-    await streamTurn(S.session.id, content, (ev) => {
-      if (ev.type === "delta") {
-        dropThinking();
-        ensureText();
-        raw += ev.text;
-        queuePaint();
-      } else if (ev.type === "tool_start") {
-        dropThinking();
-        finalizeText();
-        card = makeToolCard(ev.name, ev.args);
-        inner.append(card);
-        scrollChat();
-      } else if (ev.type === "tool_result") {
-        settleToolCard(card ?? inner.querySelector(".toolcard:last-child"), ev.ok, ev.output);
-        card = null;
-      } else if (ev.type === "phase" || ev.type === "step") {
-        refreshCtx();
-      } else if (ev.type === "error") {
-        addMsg("error", ev.message);
-      }
-    });
-  } catch (e) {
-    addMsg("error", e.message);
-  }
-
-  dropThinking();
-  finalizeText();
-  inner.querySelectorAll(".toolcard.running").forEach((el) => settleToolCard(el, true, ""));
-  S.streaming = false;
-  $("#send")?.classList.remove("busy");
-  setComposer(true);
-  refreshCtx();
-}
-
-async function streamTurn(sessionId, content, onEvent) {
-  const res = await fetch(`/api/sessions/${sessionId}/message`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
-  if (!res.ok || !res.body) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      const line = buf.slice(0, i).trim();
-      buf = buf.slice(i + 1);
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (!payload) continue;
-      try {
-        onEvent(JSON.parse(payload));
-      } catch {
-        /* skip malformed line */
-      }
-    }
-  }
-}
-
-/* ---------------------------------------------------------------- graph view */
-
-const graphMounts = []; // { handle, text } — live Pele mounts for the current graph view
-
-function destroyGraphMounts() {
-  for (const m of graphMounts) {
-    try {
-      m.handle.destroy();
-    } catch {
-      /* already gone */
-    }
-  }
-  graphMounts.length = 0;
-}
-
-// Mirrors cgNodeId() in src/mermaid.ts — the SVG data-id ↔ proposition link.
-function cgDomId(propId) {
-  return propId.replace(/[^A-Za-z0-9]/g, "") || "n";
-}
-
-function withDirection(text, dir) {
-  return text.replace(/^flowchart \S+/, `flowchart ${dir}`);
-}
-
-function cgShort(text, max = 44) {
-  const one = String(text ?? "").replace(/\s+/g, " ").trim();
-  return one.length <= max ? one : `${one.slice(0, max).trimEnd()}…`;
-}
-
-function closeConceptDrawer() {
-  const drawer = $("#cg-drawer");
-  if (!drawer) return;
-  drawer.classList.remove("open");
-  drawer.setAttribute("aria-hidden", "true");
-  $("#cg-scrim").hidden = true;
-  document.querySelectorAll(".cg .pele-node.cg-selected").forEach((n) => n.classList.remove("cg-selected"));
-}
-
-function openConceptDrawer(p, allProps, sectionTopicId) {
-  const drawer = $("#cg-drawer");
-  document.querySelectorAll(".cg .pele-node.cg-selected").forEach((n) => n.classList.remove("cg-selected"));
-  $(`.topic-block[data-topic="${CSS.escape(sectionTopicId)}"] .pele-node[data-id="${cgDomId(p.id)}"]`)?.classList.add("cg-selected");
-
-  const byId = new Map(allProps.map((x) => [x.id, x]));
-  const prereqs = p.prereqs.map((id) => byId.get(id)).filter(Boolean);
-  drawer.innerHTML = `
-    <div class="cg-drawer-head">
-      <span class="label">${sectionTopicId === "__other" ? "Unfiled concept" : "Concept"}</span>
-      <button class="icon-btn" id="cg-close" aria-label="Close">${icon("x")}</button>
-    </div>
-    <p class="cg-claim">${esc(p.text)}</p>
-    <div class="cg-meta">
-      ${new Date(p.dueAt).getTime() <= Date.now() ? `<span class="pill due">due</span>` : ""}
-      <span class="pill">level ${p.reviewLevel}</span>
-      <span class="pill">seen ${p.passes}/${p.timesSeen}</span>
-    </div>
-    <p class="hint">Due ${esc((p.dueAt || "").slice(0, 10))} · ${p.lastReviewedAt ? `last reviewed ${relTime(p.lastReviewedAt)}` : "never reviewed"} · learned ${relTime(p.createdAt)}</p>
-    ${prereqs.length ? `<div class="cg-prereqs"><h3 class="label">Builds on</h3><div class="cg-chips">${prereqs.map((x) => `<button class="chip" data-cg="${esc(x.id)}" title="${esc(x.text)}">${esc(cgShort(x.text))}</button>`).join("")}</div></div>` : ""}
-    ${p.sourceSessionId ? `<a class="btn secondary block" href="#/session/${esc(p.sourceSessionId)}">${icon("book", 14)} Open source session</a>` : ""}`;
-  $("#cg-close").onclick = closeConceptDrawer;
-  drawer.querySelectorAll("[data-cg]").forEach((btn) => {
-    btn.onclick = () => {
-      const next = byId.get(btn.dataset.cg);
-      if (next) openConceptDrawer(next, allProps, next.topicId);
-    };
-  });
-  drawer.classList.add("open");
-  drawer.setAttribute("aria-hidden", "false");
-  $("#cg-scrim").hidden = false;
-}
-
-async function showGraph() {
-  S.session = null;
-  destroyGraphMounts();
-  closeConceptDrawer();
-  setNav("graph");
-  const app = $("#app");
-  app.onclick = null;
-  app.innerHTML = `<p class="loading">Loading…</p>`;
-  let g;
-  try {
-    g = await api("/api/graph");
-  } catch (e) {
-    app.innerHTML = `<div class="page"><div class="errbox">${esc(e.message)}</div></div>`;
-    return;
-  }
-  renderSidebar();
-
-  const view = localStorage.getItem("ll-graph-view") === "list" ? "list" : "diagram";
-  const dir = localStorage.getItem("ll-graph-dir") === "LR" ? "LR" : "TD";
-  const hasPele = typeof window.pele?.mount === "function";
-
-  setMainbar(
-    `Concept graph`,
-    `<div class="seg" id="cg-view">
-      <button class="seg-btn${view === "diagram" ? " on" : ""}" data-v="diagram">${icon("graph", 13)}Diagram</button>
-      <button class="seg-btn${view === "list" ? " on" : ""}" data-v="list">${icon("plan", 13)}List</button>
-    </div>
-    <div class="seg" id="cg-dir"${view === "list" || !hasPele ? " hidden" : ""}>
-      <button class="seg-btn${dir === "TD" ? " on" : ""}" data-d="TD">Top-down</button>
-      <button class="seg-btn${dir === "LR" ? " on" : ""}" data-d="LR">Left-right</button>
-    </div>
-    <a class="btn secondary" style="height:30px" href="/api/graph/export" download>${icon("download", 14)} Export graph.md</a>`,
-  );
-
-  const byTopic = new Map();
-  for (const t of g.topics) byTopic.set(t.id, { topic: t, props: [] });
-  const orphans = [];
-  for (const p of g.propositions) {
-    const bucket = byTopic.get(p.topicId);
-    if (bucket) bucket.props.push(p);
-    else orphans.push(p);
-  }
-  const sections = [...byTopic.values()];
-  if (orphans.length) sections.push({ topic: { id: "__other", name: "Other", goal: "" }, props: orphans });
-
-  const dueSet = new Set(g.dueIds);
-  const depth = (p, seen = new Set()) => {
-    if (!p.prereqs.length || seen.has(p.id)) return 0;
-    seen.add(p.id);
-    let max = 0;
-    for (const pid of p.prereqs) {
-      const all = g.propositions.find((x) => x.id === pid);
-      if (all) max = Math.max(max, depth(all, seen) + 1);
-    }
-    return max;
-  };
-  const rows = (props) =>
-    props
-      .slice()
-      .sort((a, b) => depth(a) - depth(b) || a.createdAt.localeCompare(b.createdAt))
-      .map(
-        (p) => `
-      <div class="prop" style="margin-left:${Math.min(depth(p), 5) * 20}px">
-        <code class="pid">${esc(p.id.slice(0, 10))}</code>
-        <span class="text">${esc(p.text)}</span>
-        ${dueSet.has(p.id) ? `<span class="pill due">due</span>` : ""}
-        ${p.prereqs.length ? `<span class="deps">← ${p.prereqs.map((x) => esc(x.slice(0, 8))).join(", ")}</span>` : ""}
-        <span class="seen">seen ${p.passes}/${p.timesSeen}</span>
-      </div>`,
-      )
-      .join("");
-
-  if (!g.propositions.length) {
-    app.innerHTML = `<div class="page"><div class="card"><div class="empty"><span class="i">${icon("graph", 28)}</span><br>Your graph is empty.<br>Finish a learning session and verified propositions will appear here.</div></div></div>`;
-    return;
-  }
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="page-head"><h1>Concept graph</h1><span class="sub">${g.propositions.length} propositions · ${g.topics.length} topics</span></div>
-      <div id="cg-sections">
-        ${sections
-          .map(
-            ({ topic, props }) => `
-        <div class="card topic-block" data-topic="${esc(topic.id)}">
-          <h2>${esc(topic.name)} ${topic.id !== "__other" && topic.active ? `<span class="pill hot">active</span>` : topic.id !== "__other" ? `<span class="pill phase done">complete</span>` : ""}</h2>
-          ${topic.id !== "__other" ? `<p class="hint">Goal: ${esc(topic.goal || "—")}</p>` : ""}
-          <div class="cg-body" style="margin-top:10px"></div>
-        </div>`,
-          )
-          .join("")}
+      <p class="form-error" id="add-error" hidden></p>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost" id="add-cancel">Cancel</button>
+        <button type="submit" class="btn primary" id="add-save">Save blog</button>
       </div>
-    </div>`;
+    </form>
+  </div>`;
+  document.body.appendChild(wrap);
 
-  const bodyFor = (topicId) => $(`.topic-block[data-topic="${CSS.escape(topicId)}"] .cg-body`);
+  let mode = "url";
+  let onKey = null;
+  const close = () => {
+    wrap.remove();
+    if (onKey) document.removeEventListener("keydown", onKey);
+    onKey = null;
+  };
+  const setMode = (next) => {
+    mode = next;
+    wrap.querySelectorAll("[data-tab]").forEach((tab) => {
+      const on = tab.dataset.tab === next;
+      tab.classList.toggle("on", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    wrap.querySelectorAll("[data-pane]").forEach((pane) => (pane.hidden = pane.dataset.pane !== next));
+    setTimeout(() => $(next === "url" ? "#add-url" : "#add-markdown")?.focus(), 0);
+  };
 
-  const fillList = () => {
-    for (const { topic, props } of sections) {
-      bodyFor(topic.id).innerHTML = props.length ? rows(props) : `<p class="hint">No concepts yet.</p>`;
+  wrap.querySelectorAll("[data-tab]").forEach((tab) => (tab.onclick = () => setMode(tab.dataset.tab)));
+  $("#add-close").onclick = close;
+  $("#add-cancel").onclick = close;
+  wrap.addEventListener("click", (e) => {
+    if (e.target === wrap) close();
+  });
+  onKey = (e) => {
+    if (e.key === "Escape") close();
+  };
+  document.addEventListener("keydown", onKey);
+
+  $("#add-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const err = $("#add-error");
+    const save = $("#add-save");
+    const showError = (msg) => {
+      err.textContent = msg;
+      err.hidden = false;
+    };
+    err.hidden = true;
+
+    const payload =
+      mode === "url"
+        ? { url: $("#add-url").value.trim() }
+        : { title: $("#add-paste-title").value.trim(), markdown: $("#add-markdown").value };
+    if (mode === "url" && !payload.url) return showError("Paste the post's URL first.");
+    if (mode === "paste" && !payload.markdown.trim()) return showError("Paste the article text first.");
+
+    save.disabled = true;
+    const label = save.textContent;
+    save.textContent = mode === "url" ? "Fetching…" : "Saving…";
+    try {
+      const blog = await api("/api/blogs", { method: "POST", body: JSON.stringify(payload) });
+      close();
+      await refreshShell();
+      toast("Saved under memory/blogs/.");
+      navigate(`#/blog/${encodeURIComponent(blog.slug)}`);
+    } catch (ex) {
+      save.disabled = false;
+      save.textContent = label;
+      showError(ex.message);
     }
   };
 
-  const fillDiagrams = () => {
-    let mounted = 0;
-    for (const { topic, props } of sections) {
-      const body = bodyFor(topic.id);
-      const text = topic.id === "__other" ? g.mermaidOther : (g.mermaidByTopic ?? {})[topic.id];
-      if (!props.length || !text) {
-        body.innerHTML = `<p class="hint">No concepts yet.</p>`;
-        continue;
-      }
-      const holder = document.createElement("div");
-      holder.className = "cg";
-      body.innerHTML = "";
-      body.append(holder);
-      try {
-        const handle = window.pele.mount(holder, withDirection(text, dir));
-        graphMounts.push({ handle, text });
-        mounted++;
-      } catch (e) {
-        body.innerHTML = `<p class="hint">Diagram failed: ${esc(e.message)}</p>`;
-      }
-    }
-    if (!mounted) fillList(); // e.g. Pele failed to load — fall back to the list
-  };
-
-  if (view === "diagram" && hasPele) fillDiagrams();
-  else fillList();
-
-  $("#cg-view").onclick = (e) => {
-    const btn = e.target.closest("[data-v]");
-    if (!btn || btn.classList.contains("on")) return;
-    localStorage.setItem("ll-graph-view", btn.dataset.v);
-    showGraph();
-  };
-
-  $("#cg-dir").onclick = (e) => {
-    const btn = e.target.closest("[data-d]");
-    if (!btn || btn.classList.contains("on")) return;
-    const d = btn.dataset.d === "LR" ? "LR" : "TD";
-    localStorage.setItem("ll-graph-dir", d);
-    $("#cg-dir").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("on", b.dataset.d === d));
-    for (const m of graphMounts) m.handle.update(withDirection(m.text, d));
-  };
-
-  app.onclick = (e) => {
-    const node = e.target.closest?.(".pele-node");
-    if (!node || !node.dataset.id) return;
-    const block = node.closest(".topic-block");
-    if (!block) return;
-    const sec = sections.find((s) => s.topic.id === block.dataset.topic);
-    const prop = sec?.props.find((x) => cgDomId(x.id) === node.dataset.id);
-    if (prop) openConceptDrawer(prop, g.propositions, sec.topic.id);
-  };
+  setTimeout(() => $("#add-url")?.focus(), 30);
 }
 
 /* ---------------------------------------------------------------- settings */
 
 async function showSettings() {
-  S.session = null;
-  setNav("settings");
+  setNav("");
   setMainbar("Settings");
+  document.title = "Settings — Drongo";
   const app = $("#app");
   app.innerHTML = `<p class="loading">Loading…</p>`;
   let cfg;
@@ -1086,7 +655,6 @@ async function showSettings() {
     app.innerHTML = `<div class="page narrow"><div class="errbox">${esc(e.message)}</div></div>`;
     return;
   }
-  renderSidebar();
   app.innerHTML = `
   <div class="page narrow">
     <div class="card">
@@ -1114,10 +682,22 @@ async function showSettings() {
       <p id="cfg-result" class="hint" style="white-space:pre-wrap;margin-top:12px"></p>
     </div>
     <div class="card">
+      <h2>Appearance</h2>
+      <p class="hint">Each theme is a single CSS file of design tokens in <code>web/themes/</code>. Tokyo Night is the default; your choice is remembered on this device.</p>
+      <div class="theme-grid" role="radiogroup" aria-label="Theme">
+        ${THEMES.map(themeCard).join("")}
+      </div>
+    </div>
+    <div class="card">
       <h2>Where your data lives</h2>
-      <p class="hint">Sessions, the knowledge graph, and this key are stored under <code>memory/</code> next to the app — plain JSON you can open, edit, back up, or delete. Nothing is sent anywhere except model calls to the provider you configure above.</p>
+      <p class="hint">Blogs, digests, example workspaces, and this key live under <code>memory/</code> next to the app — plain files you can open, edit, back up, or delete. Nothing is sent anywhere except model calls to the provider you configure above.</p>
     </div>
   </div>`;
+
+  app.querySelectorAll("[data-theme-choice]").forEach((el) => {
+    el.onclick = () => applyTheme(el.dataset.themeChoice);
+  });
+  syncThemeUI();
 
   const formVals = () => ({
     baseUrl: $("#cfg-base").value.trim(),
@@ -1128,7 +708,7 @@ async function showSettings() {
     try {
       await api("/api/config", { method: "PUT", body: JSON.stringify(formVals()) });
       toast("Saved.");
-      refreshShell();
+      await refreshShell();
       showSettings();
     } catch (e) {
       toast(e.message, true);
@@ -1150,5 +730,5 @@ async function showSettings() {
 
 initTheme();
 wireShell();
-refreshShell();
-route();
+window.addEventListener("hashchange", route);
+refreshShell().then(route).catch(route);

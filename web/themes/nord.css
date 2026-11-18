@@ -1,0 +1,36 @@
+/* Nord — arctic blues and muted frost, quiet and cold. */
+[data-theme="nord"] {
+  color-scheme: dark;
+  --bg: #2e3440;
+  --surface: #3b4252;
+  --panel: #292e39;
+  --raised: #434c5e;
+  --hover: rgba(236, 239, 244, 0.055);
+  --active: rgba(236, 239, 244, 0.1);
+  --text: #eceff4;
+  --subtext: #d8dee9;
+  --muted: #7b88a1;
+  --faint: #4c566a;
+  --border: #3b4252;
+  --border-strong: #4c566a;
+  --accent: #88c0d0;
+  --accent-hover: #9fd0de;
+  --accent-contrast: #2e3440;
+  --accent-text: #8fbcbb;
+  --accent-subtle: rgba(136, 192, 208, 0.14);
+  --accent-ring: rgba(136, 192, 208, 0.4);
+  --eye: #bf616a;
+  --ok: #a3be8c;
+  --ok-subtle: rgba(163, 190, 140, 0.12);
+  --danger: #bf616a;
+  --danger-subtle: rgba(191, 97, 106, 0.1);
+  --info: #81a1c1;
+  --info-subtle: rgba(129, 161, 193, 0.12);
+  --warn: #ebcb8b;
+  --warn-subtle: rgba(235, 203, 139, 0.12);
+  --iris-a: #5e81ac;
+  --iris-b: #81a1c1;
+  --iris-c: #88c0d0;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

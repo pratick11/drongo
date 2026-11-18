@@ -1,0 +1,36 @@
+/* Rosé Pine — dusky plum, rose gold, and foam. */
+[data-theme="rose-pine"] {
+  color-scheme: dark;
+  --bg: #191724;
+  --surface: #1f1d2e;
+  --panel: #16141f;
+  --raised: #26233a;
+  --hover: rgba(224, 222, 244, 0.055);
+  --active: rgba(224, 222, 244, 0.1);
+  --text: #e0def4;
+  --subtext: #c5c3dd;
+  --muted: #6e6a86;
+  --faint: #403d52;
+  --border: #26233a;
+  --border-strong: #403d52;
+  --accent: #ebbcba;
+  --accent-hover: #f2cecc;
+  --accent-contrast: #191724;
+  --accent-text: #ebbcba;
+  --accent-subtle: rgba(235, 188, 186, 0.13);
+  --accent-ring: rgba(235, 188, 186, 0.38);
+  --eye: #eb6f92;
+  --ok: #9ccfd8;
+  --ok-subtle: rgba(156, 207, 216, 0.12);
+  --danger: #eb6f92;
+  --danger-subtle: rgba(235, 111, 146, 0.1);
+  --info: #9ccfd8;
+  --info-subtle: rgba(156, 207, 216, 0.12);
+  --warn: #f6c177;
+  --warn-subtle: rgba(246, 193, 119, 0.12);
+  --iris-a: #eb6f92;
+  --iris-b: #c4a7e7;
+  --iris-c: #9ccfd8;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

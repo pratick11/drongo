@@ -1,0 +1,36 @@
+/* Monokai — the classic editor palette: lime, hot pink, cyan. */
+[data-theme="monokai"] {
+  color-scheme: dark;
+  --bg: #272822;
+  --surface: #2e2f27;
+  --panel: #1e1f1c;
+  --raised: #3e3d32;
+  --hover: rgba(248, 248, 242, 0.055);
+  --active: rgba(248, 248, 242, 0.1);
+  --text: #f8f8f2;
+  --subtext: #cfcfc2;
+  --muted: #75715e;
+  --faint: #49483e;
+  --border: #3e3d32;
+  --border-strong: #49483e;
+  --accent: #a6e22e;
+  --accent-hover: #b8f04a;
+  --accent-contrast: #272822;
+  --accent-text: #b8f04a;
+  --accent-subtle: rgba(166, 226, 46, 0.14);
+  --accent-ring: rgba(166, 226, 46, 0.38);
+  --eye: #f92672;
+  --ok: #a6e22e;
+  --ok-subtle: rgba(166, 226, 46, 0.12);
+  --danger: #f92672;
+  --danger-subtle: rgba(249, 38, 114, 0.1);
+  --info: #66d9ef;
+  --info-subtle: rgba(102, 217, 239, 0.12);
+  --warn: #e6db74;
+  --warn-subtle: rgba(230, 219, 116, 0.12);
+  --iris-a: #f92672;
+  --iris-b: #fd971f;
+  --iris-c: #e6db74;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

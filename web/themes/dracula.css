@@ -1,0 +1,36 @@
+/* Dracula — midnight violet, neon pink, and a whole lot of purple. */
+[data-theme="dracula"] {
+  color-scheme: dark;
+  --bg: #282a36;
+  --surface: #21222c;
+  --panel: #1e1f29;
+  --raised: #343746;
+  --hover: rgba(248, 248, 242, 0.055);
+  --active: rgba(248, 248, 242, 0.1);
+  --text: #f8f8f2;
+  --subtext: #c8cad8;
+  --muted: #6272a4;
+  --faint: #44475a;
+  --border: #383a4a;
+  --border-strong: #4d5068;
+  --accent: #bd93f9;
+  --accent-hover: #caa9fa;
+  --accent-contrast: #1e1f29;
+  --accent-text: #d0a9ff;
+  --accent-subtle: rgba(189, 147, 249, 0.14);
+  --accent-ring: rgba(189, 147, 249, 0.4);
+  --eye: #ff5555;
+  --ok: #50fa7b;
+  --ok-subtle: rgba(80, 250, 123, 0.12);
+  --danger: #ff5555;
+  --danger-subtle: rgba(255, 85, 85, 0.1);
+  --info: #8be9fd;
+  --info-subtle: rgba(139, 233, 253, 0.12);
+  --warn: #f1fa8c;
+  --warn-subtle: rgba(241, 250, 140, 0.12);
+  --iris-a: #ff79c6;
+  --iris-b: #bd93f9;
+  --iris-c: #8be9fd;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

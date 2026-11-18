@@ -1,0 +1,36 @@
+/* Solarized Dark — Ethan Schoonover's calibrated teal-and-cyan classic. */
+[data-theme="solarized"] {
+  color-scheme: dark;
+  --bg: #002b36;
+  --surface: #073642;
+  --panel: #00252e;
+  --raised: #0a4050;
+  --hover: rgba(147, 161, 161, 0.055);
+  --active: rgba(147, 161, 161, 0.1);
+  --text: #93a1a1;
+  --subtext: #839496;
+  --muted: #657b83;
+  --faint: #586e75;
+  --border: #073642;
+  --border-strong: #586e75;
+  --accent: #2aa198;
+  --accent-hover: #35b8ae;
+  --accent-contrast: #002b36;
+  --accent-text: #2aa198;
+  --accent-subtle: rgba(42, 161, 152, 0.14);
+  --accent-ring: rgba(42, 161, 152, 0.4);
+  --eye: #dc322f;
+  --ok: #859900;
+  --ok-subtle: rgba(133, 153, 0, 0.12);
+  --danger: #dc322f;
+  --danger-subtle: rgba(220, 50, 47, 0.1);
+  --info: #268bd2;
+  --info-subtle: rgba(38, 139, 210, 0.12);
+  --warn: #b58900;
+  --warn-subtle: rgba(181, 137, 0, 0.12);
+  --iris-a: #268bd2;
+  --iris-b: #2aa198;
+  --iris-c: #859900;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

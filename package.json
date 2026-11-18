@@ -1,7 +1,7 @@
 {
   "name": "drongo",
   "version": "0.1.0",
-  "description": "Agentic learning harness named for the greater racket-tailed drongo \u2014 the master mimic. Measure, Plan, Teach, Practice \u2014 with local knowledge-graph memory. Bring your own API key.",
+  "description": "Local-first harness for the tech blogs you save but never finish reading — keeps the post, breaks it into first-principles units, and builds a runnable example for each. Bring your own API key.",
   "type": "module",
   "scripts": {
     "start": "tsx src/server.ts",

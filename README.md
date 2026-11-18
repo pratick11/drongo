@@ -95,11 +95,17 @@ calling) works:
 | LM Studio | `http://localhost:1234/v1` |
 | Enterprise gateway | whatever your team's OpenAI-compatible proxy is |
 
-The LLM never touches your files directly — it can only mutate memory through a
+The LLM never touches your files outside a jail — memory changes go through a
 small tool registry (`save_propositions`, `update_plan`, `mark_step_done`,
 `report_move`, `schedule_review`, `read_memory`, `record_assessment`), so every
 change is inspectable in `graph.json`. Teaching decisions (repairs, plan
 refills, blocks, promotions) are logged in the session file.
+
+In the teach and practice phases the tutor also gets world tools — `bash`,
+`read_file`, `write_file`, `edit_file` — jailed to a per-session workspace at
+`<data dir>/workspaces/<session id>`. It uses them to build and run code
+examples (real output, never invented) and to scaffold rebuild exercises.
+Shell access can be turned off in `config.json` with `"tools": { "bash": false }`.
 
 ## Environment variables
 
@@ -110,11 +116,23 @@ refills, blocks, promotions) are logged in the session file.
 | `NO_OPEN` | unset | set to skip auto-opening the browser |
 | `DRONGO_MOCK` | unset | set to `1` for scripted no-network demo mode (`LEARNLITE_MOCK` still honored) |
 
+## Themes
+
+Tokyo Night is the default. Pick another from the palette button in the sidebar,
+or from **Settings → Appearance**: Paper, Catppuccin, Dracula, GitHub Dark,
+Gruvbox, Monokai, Nord, One Dark, Rosé Pine, and Solarized. Your choice is
+remembered per device.
+
+Every theme is one CSS file of design tokens under `web/themes/`. To add one,
+copy an existing file, change the `[data-theme="…"]` name and the token values,
+link it in `web/index.html`, and register its id and label in `THEMES` in
+`web/app.js`.
+
 ## Development
 
 ```bash
 npm run dev        # server with watch/restart
-npm test           # 33 tests, deterministic: no LLM, no network
+npm test           # 45 tests, deterministic: no LLM, no network
 npm run typecheck  # tsc --noEmit
 ```
 

@@ -1,16 +1,24 @@
 import path from "node:path";
 import { readJson, writeJsonAtomic } from "./fsutil.ts";
 
+export interface ToolsConfig {
+  bash: boolean;
+  timeoutMs: number;
+  maxOutputChars: number;
+}
+
 export interface AppConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  tools: ToolsConfig;
 }
 
 const DEFAULTS: AppConfig = {
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
   model: "gpt-4.1-mini",
+  tools: { bash: true, timeoutMs: 30_000, maxOutputChars: 10_000 },
 };
 
 export function configPath(dataDir: string): string {
@@ -18,7 +26,12 @@ export function configPath(dataDir: string): string {
 }
 
 export function loadConfig(dataDir: string): AppConfig {
-  return { ...DEFAULTS, ...readJson<Partial<AppConfig>>(configPath(dataDir), {}) };
+  const saved = readJson<Partial<AppConfig>>(configPath(dataDir), {});
+  return {
+    ...DEFAULTS,
+    ...saved,
+    tools: { ...DEFAULTS.tools, ...saved.tools },
+  };
 }
 
 export function saveConfig(cfg: AppConfig, dataDir: string): void {

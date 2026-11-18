@@ -1,37 +1,36 @@
+import path from "node:path";
 import type { AppConfig } from "./config.ts";
 import { streamChat, type LLMMessage, type ToolCall } from "./llm.ts";
 import { systemPrompt } from "./prompts.ts";
-import { loadGraph } from "./graph.ts";
-import { saveSession, type Phase, type Session } from "./session.ts";
-import { executeTool, toolsForPhase } from "./tools.ts";
+import { saveConversation, type Conversation } from "./session.ts";
+import { allTools, executeTool } from "./tools.ts";
 
 export type AgentEvent =
   | { type: "delta"; text: string }
   | { type: "tool_start"; name: string; args: unknown }
   | { type: "tool_result"; name: string; ok: boolean; output: string }
-  | { type: "phase"; phase: Phase }
-  | { type: "step"; stepId: string | null }
   | { type: "error"; message: string };
 
-const MAX_ROUNDS = 8;
+// World tools (bash, file edits) mean a single step of real work can take
+// several rounds — write the example, run it, fix it, run it again.
+const MAX_ROUNDS = 16;
 
 // Runs one user turn: model calls (streamed to the client) interleaved with
 // tool executions, until the model produces a reply without tool calls. The
-// system prompt is rebuilt each round, so a phase flip mid-turn applies to the
-// very next model call.
+// system prompt is rebuilt each round, so a digest or unit saved mid-turn is
+// visible to the very next model call.
 export async function runTurn(
-  session: Session,
+  conversation: Conversation,
   opts: { dataDir: string; cfg: AppConfig },
   emit: (e: AgentEvent) => void,
 ): Promise<void> {
   const { dataDir, cfg } = opts;
-  let phaseAtStart = session.phase;
+  const workspaceDir = path.join(dataDir, "workspaces", conversation.id);
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const graph = loadGraph(dataDir);
-    const system: LLMMessage = { role: "system", content: systemPrompt(session, graph) };
-    const messages: LLMMessage[] = [system, ...session.messages];
-    const tools = toolsForPhase(session.phase);
+    const system: LLMMessage = { role: "system", content: systemPrompt(conversation) };
+    const messages: LLMMessage[] = [system, ...conversation.messages];
+    const tools = allTools();
 
     let text = "";
     let toolCalls: ToolCall[] | null = null;
@@ -51,37 +50,32 @@ export async function runTurn(
       }
     }
     if (failed) {
-      persistAssistant(session, text, dataDir);
+      persistAssistant(conversation, text, dataDir);
       return;
     }
 
     if (toolCalls && toolCalls.length) {
-      session.messages.push({ role: "assistant", content: text || null, tool_calls: toolCalls });
+      conversation.messages.push({ role: "assistant", content: text || null, tool_calls: toolCalls });
       for (const call of toolCalls) {
         emit({ type: "tool_start", name: call.function.name, args: safeParse(call.function.arguments) });
-        const result = await executeTool(call.function.name, call.function.arguments, { dataDir, session });
+        const result = await executeTool(call.function.name, call.function.arguments, { dataDir, workspaceDir, cfg });
         emit({ type: "tool_result", name: call.function.name, ok: result.ok, output: result.output });
-        session.messages.push({ role: "tool", tool_call_id: call.id, content: result.output });
+        conversation.messages.push({ role: "tool", tool_call_id: call.id, content: result.output });
       }
-      saveSession(session, dataDir);
-      if (session.phase !== phaseAtStart) {
-        phaseAtStart = session.phase;
-        emit({ type: "phase", phase: session.phase });
-        emit({ type: "step", stepId: session.currentStepId });
-      }
+      saveConversation(conversation, dataDir);
       continue;
     }
 
-    persistAssistant(session, text, dataDir);
+    persistAssistant(conversation, text, dataDir);
     return;
   }
 
   emit({ type: "error", message: `Stopped after ${MAX_ROUNDS} tool rounds — possible tool loop.` });
 }
 
-function persistAssistant(session: Session, text: string, dataDir: string): void {
-  if (text.trim()) session.messages.push({ role: "assistant", content: text });
-  saveSession(session, dataDir);
+function persistAssistant(conversation: Conversation, text: string, dataDir: string): void {
+  if (text.trim()) conversation.messages.push({ role: "assistant", content: text });
+  saveConversation(conversation, dataDir);
 }
 
 function safeParse(args: string): unknown {

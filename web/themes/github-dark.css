@@ -1,0 +1,36 @@
+/* GitHub Dark — the familiar ink-black canvas and link blue. */
+[data-theme="github-dark"] {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --panel: #010409;
+  --raised: #21262d;
+  --hover: rgba(230, 237, 243, 0.055);
+  --active: rgba(230, 237, 243, 0.1);
+  --text: #e6edf3;
+  --subtext: #c9d1d9;
+  --muted: #8b949e;
+  --faint: #30363d;
+  --border: #30363d;
+  --border-strong: #484f58;
+  --accent: #2f81f7;
+  --accent-hover: #58a6ff;
+  --accent-contrast: #ffffff;
+  --accent-text: #58a6ff;
+  --accent-subtle: rgba(47, 129, 247, 0.14);
+  --accent-ring: rgba(47, 129, 247, 0.4);
+  --eye: #f85149;
+  --ok: #3fb950;
+  --ok-subtle: rgba(63, 185, 80, 0.12);
+  --danger: #f85149;
+  --danger-subtle: rgba(248, 81, 73, 0.1);
+  --info: #58a6ff;
+  --info-subtle: rgba(88, 166, 255, 0.12);
+  --warn: #d29922;
+  --warn-subtle: rgba(210, 153, 34, 0.12);
+  --iris-a: #1f6feb;
+  --iris-b: #2f81f7;
+  --iris-c: #58a6ff;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.55), 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
